@@ -10,7 +10,7 @@ Trif is only dynamically typed so that typed variants of the language compile to
 
 The result of a Trif program is guaranteed to be deterministic. This means there can never be side effects in the language because that would allow independent subterms to influence one another and break determinism.
 
-Trif's evaluation model does not distinguish call-by-name from call-by-value. Lists are evaluated only when accessed.
+Trif's evaluation model does not distinguish call-by-name and call-by-value. Lists are evaluated only when accessed.
 
 ## Functional Programming
 

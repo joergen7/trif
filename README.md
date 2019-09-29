@@ -2,15 +2,19 @@
 
 Trif is a parallel, dynamically typed functional programming language with a Lisp syntax.
 
+## Parallelism and Determinism
+
+Trif is a proof-of-concept for a functional programming language that is not based on an operational semantics but on a Petri net semantics. The definition naturally allows using subterm independence for parallelism.
+
+As a consequence, Trif's evaluation model does not distinguish call-by-name and call-by-value. Lists are evaluated only when accessed.
+
+I want the result of a Trif program to be deterministic. For that to work, there can be no side effects because that would allow independent subterms to influence one another and break determinism.
+
+Although this approach allows using all CPUs in a computer and to have several computers cooperate I do not expect Trif to beat C at quicksort.
+
 ## Dynamic Typing
 
 Trif is only dynamically typed so that typed variants of the language compile to Trif as a kernel language. The independence of Trif from a concrete type system allows several such variants to exist.
-
-## Parallelism and Determinism
-
-The result of a Trif program is guaranteed to be deterministic. This means there can never be side effects in the language because that would allow independent subterms to influence one another and break determinism.
-
-Trif's evaluation model does not distinguish call-by-name and call-by-value. Lists are evaluated only when accessed.
 
 ## Functional Programming
 

@@ -28,3 +28,43 @@
 %%
 %% @end
 %% -------------------------------------------------------------------
+
+%% ==================================================================
+%% Definitions
+%% ==================================================================
+
+Definitions.
+
+LPAREN = \(
+RPAREN = \)
+TRUE   = #t
+FALSE  = #f
+
+ID          = [A-Za-z][A-Za-z0-9\.\-_\?!/\*]*
+
+COMMENT     = ;.*
+WS          = [\000-\s]
+
+
+%% ==================================================================
+%% Rules
+%% ==================================================================
+
+Rules.
+
+{LPAREN} : {token, {lparen, TokenLine, TokenChars}}.
+{RPAREN} : {token, {rparen, TokenLine, TokenChars}}.
+{TRUE}   : {token, {true, TokenLine, TokenChars}}.
+{FALSE}  : {token, {false, TokenLine, TokenChars}}.
+{ID}     : {token, {id, TokenLine, TokenChars}}.
+
+{COMMENT}     : skip_token.
+{WS}          : skip_token.
+
+
+%% ==================================================================
+%% Erlang Code
+%% ==================================================================
+
+Erlang code.
+

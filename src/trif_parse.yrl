@@ -28,3 +28,63 @@
 %%
 %% @end
 %% -------------------------------------------------------------------
+
+%%====================================================================
+%% Symbol Declaration
+%%====================================================================
+
+Nonterminals
+  seq expr.
+
+Terminals
+  lparen rparen true false id.
+
+
+%%====================================================================
+%% Syntax Definition
+%%====================================================================
+
+Rootsymbol seq.
+
+seq  -> expr              : ['$1'].
+seq  -> expr seq          : ['$1'|'$2'].
+
+expr -> true              : true( '$1' ).
+expr -> false             : false( '$1' ).
+expr -> id                : id( '$1' ).
+expr -> lparen rparen     : list( '$1', [] ).
+expr -> lparen seq rparen : list( '$1', '$2' ).
+
+%%====================================================================
+%% Erlang Code
+%%====================================================================
+
+Erlang code.
+
+-include( "trif.hrl" ).
+
+-spec true( {true, pos_integer(), string()} ) -> {true, pos_integer()}.
+
+true( {true, TokenLine, _} ) ->
+  {true, TokenLine}.
+
+
+-spec false( {false, pos_integer(), string()} ) -> {false, pos_integer()}.
+
+false( {false, TokenLine, _} ) ->
+  {false, TokenLine}.
+
+
+-spec id( {id, pos_integer(), string()} ) -> {symbol, pos_integer(), binary()}.
+
+id( {id, TokenLine, TokenChars} ) ->
+  {symbol, TokenLine, list_to_binary( TokenChars )}.
+
+
+-spec list( {lparen, pos_integer(), string()}, [e()] ) -> e().
+
+list( {lparen, TokenLine, _}, [] ) ->
+  {null, TokenLine};
+
+list( I = {lparen, TokenLine, _}, [H|T] ) ->
+  {cons, TokenLine, H, list( I, T )}.

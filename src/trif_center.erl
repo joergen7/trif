@@ -29,6 +29,42 @@
 %% @end
 %% -------------------------------------------------------------------
 
--module( trif_stall ).
+-module( trif_center ).
+-behaviour( gen_server ).
 
 -export( [] ).
+
+-include( "trif.hrl" ).
+
+-type center_state() :: {Prog   :: e(),
+                         Stall  :: #{closure() => closure()},
+                         Value  :: #{closure() => closure()},
+                         Active :: [{closure(), closure()}]}.
+
+-spec step( center_state() ) => {ok, center_state()} | norule.
+
+step( {Prog,
+       Stall,
+       Value,
+       [{C1, {{cons, _, {symbol, _, <<"lambda">>}, _}, Env2}}|Active]} ) ->
+
+  #{ C1 := C0 } = Stall,
+  Stall1 = maps:remove( C1, Stall ),
+
+  {Prog, Stall1, Value, Active1}
+
+step( {Prog,
+       Stall,
+       Value,
+       [{C0, C1 = {E1 = {cons, _, _, _}, Env1}}|Active]} ) ->
+
+  Stall1 = Stall#{ C1 => C0 },
+  Active1 = Active++[{{E, Env1}, {E, Env1}} || E <- cons_to_list( E1 )],
+
+  {Prog, Stall1, Value, Active1};
+
+
+
+
+cons_to_list( {null, _} )       -> [];
+cons_to_list( {cons, _, H, T} ) -> [H|cons_to_list( T )].

@@ -29,8 +29,14 @@
 %% @end
 %% -------------------------------------------------------------------
 
--type e() :: {true, pos_integer()}
-           | {false, pos_integer()}
-           | {symbol, pos_integer(), binary()}
-           | {null, pos_integer()}
-           | {cons, pos_integer(), e(), e()}.
+-type e()       :: {true, pos_integer()}
+                 | {false, pos_integer()}
+                 | {symbol, pos_integer(), x()}
+                 | {null, pos_integer()}
+                 | {cons, pos_integer(), e(), e()}.
+
+-type x()       :: binary().
+
+-type env()     :: #{ x() => e() }.
+
+-type closure() :: {e(), env()}.

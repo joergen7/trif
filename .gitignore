@@ -12,3 +12,6 @@ _build
 rebar.lock
 src/trif_scan.erl
 src/trif_parse.erl
+
+*~
+compiled

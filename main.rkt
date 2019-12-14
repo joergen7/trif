@@ -1,50 +1,61 @@
+;; trif: dynamically typed functional programming language with a
+;; Lisp syntax
+;;
+;; Copyright 2019 Jörgen Brandt <joergen@cuneiform-lang.org>
+;;
+;; Licensed under the Apache License, Version 2.0 (the "License");
+;; you may not use this file except in compliance with the License.
+;; You may obtain a copy of the License at
+;;
+;;     http://www.apache.org/licenses/LICENSE-2.0
+;;
+;; Unless required by applicable law or agreed to in writing, software
+;; distributed under the License is distributed on an "AS IS" BASIS,
+;; WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+;; See the License for the specific language governing permissions and
+;; limitations under the License.
+;;
+;; -------------------------------------------------------------------
+
 #lang racket/base
 
-(module+ test
-  (require rackunit))
+(provide #%module-begin
+         #%top-interaction
+         define
+         (rename-out [_datum        #%datum]
+                     [_app          #%app]
+                     [_top          #%top]))
 
-;; Notice
-;; To install (from within the package directory):
-;;   $ raco pkg install
-;; To install (once uploaded to pkgs.racket-lang.org):
-;;   $ raco pkg install <<name>>
-;; To uninstall:
-;;   $ raco pkg remove <<name>>
-;; To view documentation:
-;;   $ raco docs <<name>>
-;;
-;; For your convenience, we have included LICENSE-MIT and LICENSE-APACHE files.
-;; If you would prefer to use a different license, replace those files with the
-;; desired license.
-;;
-;; Some users like to add a `private/` directory, place auxiliary files there,
-;; and require them in `main.rkt`.
-;;
-;; See the current version of the racket style guide here:
-;; http://docs.racket-lang.org/style/index.html
+(require (for-syntax (only-in racket/base
+                              syntax
+                              raise-syntax-error
+                              #%app
+                              #%datum
+                              quote)
+                     (only-in syntax/parse
+                              syntax-parse
+                              boolean
+                              str
+                              exact-integer))
+         (only-in "trif-cek.rkt"
+                  bool
+                  str
+                  int
+                  app))
 
-;; Code here
+(define-syntax (_datum stx)
+  (syntax-parse stx
+    [(_ . v:boolean)       #'(bool (#%datum . v))]
+    [(_ . v:str)           #'(str (#%datum . v))]
+    [(_ . v:exact-integer) #'(int (#%datum . v))]
+    [(_ . other)          (raise-syntax-error 'syntax
+                                              "datum must be a Boolean, string, or integer"
+                                              #'other)]))
 
+(define-syntax (_top stx)
+  (syntax-parse stx
+    [(_ . i) #'(quote i)]))
 
-
-(module+ test
-  ;; Any code in this `test` submodule runs when this file is run using DrRacket
-  ;; or with `raco test`. The code here does not run when this file is
-  ;; required by another module.
-
-  (check-equal? (+ 2 2) 4))
-
-(module+ main
-  ;; (Optional) main submodule. Put code here if you need it to be executed when
-  ;; this file is run using DrRacket or the `racket` executable.  The code here
-  ;; does not run when this file is required by another module. Documentation:
-  ;; http://docs.racket-lang.org/guide/Module_Syntax.html#%28part._main-and-test%29
-
-  (require racket/cmdline)
-  (define who (box "world"))
-  (command-line
-    #:program "my-program"
-    #:once-each
-    [("-n" "--name") name "Who to say hello to" (set-box! who name)]
-    #:args ()
-    (printf "hello ~a~n" (unbox who))))
+(define-syntax (_app stx)
+  (syntax-parse stx
+    [(_ f args ...) #'(app f (list args ...))]))

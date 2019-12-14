@@ -18,6 +18,7 @@
          (struct-out tl-no-list)
          (struct-out call-cc-narg)
          (struct-out call-cc-no-fn)
+         (struct-out continue-narg)
          Reason
          reason?
          
@@ -72,9 +73,7 @@
          (struct-out prog)
 
          ev
-         step
-
-         _and)
+         step)
 
 (require (only-in racket/match
                   define/match
@@ -101,6 +100,7 @@
 (struct tl-no-list     ([op   : Value])           #:transparent)
 (struct call-cc-narg   ([xs   : (Listof Symbol)]) #:transparent)
 (struct call-cc-no-fn  ([op   : Value])           #:transparent)
+(struct continue-narg  ([args : (Listof Expr)])   #:transparent)
   
 
 (define-type Reason
@@ -121,35 +121,37 @@
      tl-nil
      tl-no-list
      call-cc-narg
-     call-cc-no-fn))
+     call-cc-no-fn
+     continue-narg))
 
 (define-predicate reason? Reason)
 
 
 (struct eq      ([e1     : Expr]
-                 [e2     : Expr])             #:transparent)
-(struct str     ([s      : String])           #:transparent)
-(struct int     ([i      : Integer])          #:transparent)
-(struct inc     ([e      : Expr])             #:transparent)
-(struct neg     ([e      : Expr])             #:transparent)
-(struct lt      ([e1     : Expr] [e2 : Expr]) #:transparent)
-(struct bool    ([b      : Boolean])          #:transparent)
+                 [e2     : Expr])          #:transparent)
+(struct str     ([s      : String])        #:transparent)
+(struct int     ([i      : Integer])       #:transparent)
+(struct inc     ([e      : Expr])          #:transparent)
+(struct neg     ([e      : Expr])          #:transparent)
+(struct lt      ([e1     : Expr]
+                 [e2     : Expr])          #:transparent)
+(struct bool    ([b      : Boolean])       #:transparent)
 (struct cnd     ([e0     : Expr]
                  [e1     : Expr]
-                 [e2     : Expr])             #:transparent)
+                 [e2     : Expr])          #:transparent)
 (struct fn      ([xs     : (Listof Symbol)]
-                 [body   : Expr])             #:transparent)
+                 [body   : Expr])          #:transparent)
 (struct app     ([e0     : Expr]
-                 [args   : (Listof Expr)])    #:transparent)
-(struct fix     ([e      : Expr])             #:transparent)
-(struct nil     ()                            #:transparent)
+                 [args   : (Listof Expr)]) #:transparent)
+(struct fix     ([e      : Expr])          #:transparent)
+(struct nil     ()                         #:transparent)
 (struct pair    ([e1     : Expr]
-                 [e2     : Expr])             #:transparent)
-(struct isnil   ([e      : Expr])             #:transparent)
-(struct hd      ([e      : Expr])             #:transparent)
-(struct tl      ([e      : Expr])             #:transparent)
-(struct call-cc ([e      : Expr])             #:transparent)
-(struct err     ([reason : Reason])           #:transparent)
+                 [e2     : Expr])          #:transparent)
+(struct isnil   ([e      : Expr])          #:transparent)
+(struct hd      ([e      : Expr])          #:transparent)
+(struct tl      ([e      : Expr])          #:transparent)
+(struct call-cc ([e      : Expr])          #:transparent)
+(struct err     ([reason : Reason])        #:transparent)
 
 (define-type Expr
   (U eq
@@ -262,6 +264,11 @@
 (define-predicate env? Env)
 
 (struct prog ([cs : Expr] [env : Env] [k : K] [cs-value? : Boolean]))
+
+
+;;=============================================================
+;; Evaluation
+;;=============================================================
 
 (: ev (Expr -> Ev-Result))
 (define (ev e)
@@ -397,31 +404,37 @@
   ; lambda calculus
   ;-----------------------------
 
-  [((prog x env k _)) #:when (symbol? x)
+  [((prog x env k _)) #:when (symbol? x)                                       ; variable look up
    (match (assoc x env)
      [(cons _ (cons e1 env1)) (prog e1 env1 k #f)]
      [#f                      (prog (err (var-unbound x)) '() 'mt #f)])]
 
-  [((prog (fn xs e-body) env k #f))  ; functions deflect
+  [((prog (fn xs e-body) env k #f))                                            ; functions deflect
     (prog (fn xs e-body) env k #t)]
   
-  [((prog (app e0 args) env k _))
-   (prog e0 env (app-fn args env k) #f)]
+  [((prog (app e0 args) env k _))                                              ; descend application's
+   (prog e0 env (app-fn args env k) #f)]                                       ; function position
 
-  [((prog (fn '() e-body) env-fn (app-fn '() _ k) _))
-   (prog e-body env-fn k #f)]
+  [((prog (fn '() e-body) env-fn (app-fn '() _ k) _))                          ; use body if function has
+   (prog e-body env-fn k #f)]                                                  ; no argument
 
-  [((prog (fn xs e-body) env-fn (app-fn (cons arg1 args) env-app k) _))
-   (prog arg1 env-app (app-arg (fn xs e-body) env-fn '() args env-app k) #f)]
+  [((prog (fn xs e-body) env-fn (app-fn (cons arg1 args) env-app k) _))        ; switch to arguments
+   (prog arg1 env-app (app-arg (fn xs e-body) env-fn '() args env-app k) #f)]  ; if function has any
 
-  [((prog e-fn _ (app-fn _ _ k) #t))
-   (prog (err (app-no-fn (assert e-fn value?))) '() 'mt #f)]
+  [((prog k1 _ (app-fn (list e21) env-app _) _)) #:when (k? k1)                ; continue with expression
+   (prog e21 env-app k1 #f)]
 
-  [((prog e1 _ (app-arg v-fn env-fn fin-args (cons arg1 args) env-arg k) #t))
+  [((prog k1 env-fn (app-fn args _ _) _)) #:when (k? k1)                       ; error if continue does not
+   (prog (err (continue-narg args)) '() 'mt #f)]                               ; have exactly one argument
+  
+  [((prog e-fn _ (app-fn _ _ k) #t))                                           ; error if neither function
+   (prog (err (app-no-fn (assert e-fn value?))) '() 'mt #f)]                   ; nor continuation
+
+  [((prog e1 _ (app-arg v-fn env-fn fin-args (cons arg1 args) env-arg k) #t))  ; switch to next argument
    (prog arg1 env-arg (app-arg v-fn env-fn (cons (assert e1 value?) fin-args) args env-arg k) #f)]
 
-  [((prog e1 _ (app-arg (fn xs e-body) env-fn fin-args '() env-arg k) #t))
-   (let ([args : (Listof Value) (reverse (cons (assert e1 value?) fin-args))])
+  [((prog e1 _ (app-arg (fn xs e-body) env-fn fin-args '() env-arg k) #t))     ; application extends
+   (let ([args : (Listof Value) (reverse (cons (assert e1 value?) fin-args))]) ; closure
      (if (equal? (length xs) (length args))
          (let ([env1 : Env (for/fold ([env-acc : Env    env-fn])
                                      ([x       : Symbol (in-list xs)]
@@ -438,17 +451,17 @@
            (prog e-body env1 k #f))
          (prog (err (app-narg xs args)) '() 'mt #f)))]
 
-  [((prog (fix e1) env k _))
+  [((prog (fix e1) env k _))                                                   ; descend fixpoint
    (prog e1 env (fix-op env k) #f)]
 
-  [((prog (fn (cons x-f xs) e-body) _ (fix-op env k) _))
+  [((prog (fn (cons x-f xs) e-body) _ (fix-op env k) _))                       ; fixpoint replicates
    (prog (fn xs (_let x-f (fix (fn (cons x-f xs) e-body)) e-body)) env k #t)]
 
-  [((prog (fn '() e-body) _ (fix-op _ k) _))
-   (prog (err (fix-fn-no-arg (fn '() e-body))) '() 'mt #f)]
+  [((prog (fn '() e-body) _ (fix-op _ k) _))                                   ; error if fixpoint operand
+   (prog (err (fix-fn-no-arg (fn '() e-body))) '() 'mt #f)]                    ; has no argument
 
-  [((prog e1 _ (fix-op _ k) #t))
-   (prog (err (fix-no-fn (assert e1 value?))) '() 'mt #f)]
+  [((prog e1 _ (fix-op _ k) #t))                                               ; error if fixpoint operand
+   (prog (err (fix-no-fn (assert e1 value?))) '() 'mt #f)]                     ; is no function
 
   
   ;-----------------------------
@@ -507,20 +520,21 @@
   ; continuations
   ;-----------------------------
 
-  [((prog k1 _ k #f)) #:when (k? k1) ; continuations deflect
+  [((prog k1 _ k #f)) #:when (k? k1)                           ; continuations deflect
    (prog k1 '() k #t)]
 
-  [((prog (call-cc e1) env k _))
+  [((prog (call-cc e1) env k _))                               ; descend call-cc operand
    (prog e1 env (call-cc-op k) #f)]
 
-  [((prog (fn (list x-k) e-body) env (call-cc-op k) _))
-   (prog (_let x-k k e-body) env k #f)]
+  [((prog (fn (list x-k) e-body) env (call-cc-op k) _))        ; call with current continuation
+   (prog (_let x-k k e-body) env k #f)]                        ; if call-cc operand is a function
 
-  [((prog (fn xs e-body) _ (call-cc-op k) _))
-   (prog (err (call-cc-narg xs)) '() 'mt #f)]
+  [((prog (fn xs e-body) _ (call-cc-op k) _))                  ; error if call-cc operand function
+   (prog (err (call-cc-narg xs)) '() 'mt #f)]                  ; does not have exactly one argument
 
-  [((prog e1 _ (call-cc-op k) #t))
-   (prog (err (call-cc-no-fn (assert e1 value?))) '() 'mt #f)]
+  [((prog e1 _ (call-cc-op k) #t))                             ; error if call-cc operand is no
+   (prog (err (call-cc-no-fn (assert e1 value?))) '() 'mt #f)] ; function
+
   
   ;-----------------------------
   ; error
@@ -541,9 +555,9 @@
 
 
 
-
-
-
+;;=============================================================
+;; Internal Functions
+;;=============================================================
 
 (: _and (Expr Expr -> Expr))
 (define (_and e1 e2)
@@ -555,6 +569,9 @@
 
 
        
+;;=============================================================
+;; Unit Tests
+;;=============================================================
 
 (module+ test
 

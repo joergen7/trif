@@ -19,7 +19,6 @@
 
 #lang s-exp "main.rkt"
 
+(define (f k) (k 5))
 
-f
-5
-(f 4 5)
+(callcc f)

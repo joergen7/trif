@@ -214,6 +214,7 @@
 (define-predicate ev-result? Ev-Result)
 
 
+(struct mt         ()                #:transparent)
 (struct eq-lhs     ([rhs       : Expr]
                     [env       : Env]
                     [k         : K]) #:transparent)
@@ -255,7 +256,7 @@
 (struct call-cc-op ([k         : K]) #:transparent)
 
 (define-type K
-  (U 'mt
+  (U mt
      eq-lhs
      eq-rhs
      inc-op
@@ -282,7 +283,10 @@
 (define-type Env (Listof (Pairof Symbol Closure)))
 (define-predicate env? Env)
 
-(struct prog ([cs : Expr] [env : Env] [k : K] [cs-value? : Boolean]))
+(struct prog ([cs        : Expr]
+              [env       : Env]
+              [k         : K]
+              [cs-value? : Boolean]) #:transparent)
 
 
 ;;=============================================================
@@ -303,10 +307,10 @@
         p0))
 
   (define p0 : prog
-    (prog e '() 'mt #t))
+    (prog e '() (mt) #t))
 
   (match (ev* p0)
-    [(prog e1 _ '() _) (assert e1 ev-result?)]))
+    [(prog e1 _ (mt) _) (assert e1 ev-result?)]))
     
 
 
@@ -351,7 +355,7 @@
    (prog (_and (eq e11 e21) (eq e12 e22)) '() k #f)]
 
   [((prog e2 _ (eq-rhs e1 k) #t))
-   (prog (err (uncomparable e1 (assert e2 value?))) '() 'mt #f)]
+   (prog (err (uncomparable e1 (assert e2 value?))) '() (mt) #f)]
 
   ;-----------------------------
   ; strings
@@ -374,7 +378,7 @@
    (prog (int (add1 i)) '() k #t)]
 
   [((prog e1 _ (inc-op k) #t))
-   (prog (err (inc-no-int (assert e1 value?))) '() 'mt #f)]
+   (prog (err (inc-no-int (assert e1 value?))) '() (mt) #f)]
 
   [((prog (neg e1) env k _))
    (prog e1 env (neg-op k) #f)]
@@ -383,7 +387,7 @@
    (prog (int (- i)) '() k #t)]
 
   [((prog e1 _ (neg-op k) #t))
-   (prog (err (neg-no-int (assert e1 value?))) '() 'mt #f)]
+   (prog (err (neg-no-int (assert e1 value?))) '() (mt) #f)]
   
   [((prog (lt e1 e2) env k _))
    (prog e1 env (lt-lhs e2 env k) #f)]
@@ -395,10 +399,10 @@
    (prog (bool (< i1 i2)) '() k #t)]
 
   [((prog (int _) _ (lt-rhs v1 k) _))
-   (prog (err (lt-lhs-no-int v1)) '() 'mt #f)]
+   (prog (err (lt-lhs-no-int v1)) '() (mt) #f)]
 
   [((prog e2 _ (lt-rhs (int _) k) #t))
-   (prog (err (lt-rhs-no-int (assert e2 value?))) '() 'mt #f)]
+   (prog (err (lt-rhs-no-int (assert e2 value?))) '() (mt) #f)]
 
   ;-----------------------------
   ; Booleans
@@ -417,7 +421,7 @@
    (prog e2 env k #f)]
 
   [((prog e0 _ (cnd-if _ _ _ k) #t))
-   (prog (err (cnd-if-no-bool (assert e0 value?))) '() 'mt #f)]
+   (prog (err (cnd-if-no-bool (assert e0 value?))) '() (mt) #f)]
 
   ;-----------------------------
   ; lambda calculus
@@ -426,7 +430,7 @@
   [((prog x env k _)) #:when (symbol? x)                                       ; variable look up
    (match (assoc x env)
      [(cons _ (cons e1 env1)) (prog e1 env1 k #f)]
-     [#f                      (prog (err (var-unbound x)) '() 'mt #f)])]
+     [#f                      (prog (err (var-unbound x)) '() (mt) #f)])]
 
   [((prog (fn xs e-body) env k #f))                                            ; functions deflect
     (prog (fn xs e-body) env k #t)]
@@ -444,10 +448,10 @@
    (prog e21 env-app k1 #f)]
 
   [((prog k1 env-fn (app-fn args _ _) _)) #:when (k? k1)                       ; error if continue does not
-   (prog (err (continue-narg args)) '() 'mt #f)]                               ; have exactly one argument
+   (prog (err (continue-narg args)) '() (mt) #f)]                              ; have exactly one argument
   
   [((prog e-fn _ (app-fn _ _ k) #t))                                           ; error if neither function
-   (prog (err (app-no-fn (assert e-fn value?))) '() 'mt #f)]                   ; nor continuation
+   (prog (err (app-no-fn (assert e-fn value?))) '() (mt) #f)]                  ; nor continuation
 
   [((prog e1 _ (app-arg v-fn env-fn fin-args (cons arg1 args) env-arg k) #t))  ; switch to next argument
    (prog arg1 env-arg (app-arg v-fn env-fn (cons (assert e1 value?) fin-args) args env-arg k) #f)]
@@ -468,7 +472,7 @@
                              (cons pair env-acc))])
 
            (prog e-body env1 k #f))
-         (prog (err (app-narg xs args)) '() 'mt #f)))]
+         (prog (err (app-narg xs args)) '() (mt) #f)))]
 
   [((prog (fix e1) env k _))                                                   ; descend fixpoint
    (prog e1 env (fix-op env k) #f)]
@@ -477,10 +481,10 @@
    (prog (fn xs (_let x-f (fix (fn (cons x-f xs) e-body)) e-body)) env k #t)]
 
   [((prog (fn '() e-body) _ (fix-op _ k) _))                                   ; error if fixpoint operand
-   (prog (err (fix-fn-no-arg (fn '() e-body))) '() 'mt #f)]                    ; has no argument
+   (prog (err (fix-fn-no-arg (fn '() e-body))) '() (mt) #f)]                   ; has no argument
 
   [((prog e1 _ (fix-op _ k) #t))                                               ; error if fixpoint operand
-   (prog (err (fix-no-fn (assert e1 value?))) '() 'mt #f)]                     ; is no function
+   (prog (err (fix-no-fn (assert e1 value?))) '() (mt) #f)]                    ; is no function
 
   
   ;-----------------------------
@@ -509,7 +513,7 @@
    (prog (bool #f) '() k #t)]
 
   [((prog e1 _ (isnil-op k) #t))
-   (prog (err (isnil-no-list (assert e1 value?))) '() 'mt #f)]
+   (prog (err (isnil-no-list (assert e1 value?))) '() (mt) #f)]
 
   [((prog (hd e1) env k _))
    (prog e1 env (hd-op env k) #f)]
@@ -518,10 +522,10 @@
    (prog e11 env k #t)]
 
   [((prog (nil) _ (hd-op _ k) _))
-   (prog (err (hd-nil)) '() 'mt #f)]
+   (prog (err (hd-nil)) '() (mt) #f)]
 
   [((prog e1 _ (hd-op _ k) #t))
-   (prog (err (hd-no-list (assert e1 value?))) '() 'mt #f)]
+   (prog (err (hd-no-list (assert e1 value?))) '() (mt) #f)]
 
   [((prog (tl e1) env k _))
    (prog e1 env (tl-op env k) #f)]
@@ -530,29 +534,29 @@
    (prog e12 env k #t)]
   
   [((prog (nil) _ (tl-op _ k) _))
-   (prog (err (tl-nil)) '() 'mt #f)]
+   (prog (err (tl-nil)) '() (mt) #f)]
 
   [((prog e1 _ (tl-op _ k) #t))
-   (prog (err (tl-no-list (assert e1 value?))) '() 'mt #f)]
+   (prog (err (tl-no-list (assert e1 value?))) '() (mt) #f)]
 
   ;-----------------------------
   ; continuations
   ;-----------------------------
 
-  [((prog k1 _ k #f)) #:when (k? k1)                           ; continuations deflect
+  [((prog k1 _ k #f)) #:when (k? k1)                            ; continuations deflect
    (prog k1 '() k #t)]
 
-  [((prog (call-cc e1) env k _))                               ; descend call-cc operand
+  [((prog (call-cc e1) env k _))                                ; descend call-cc operand
    (prog e1 env (call-cc-op k) #f)]
 
-  [((prog (fn (list x-k) e-body) env (call-cc-op k) _))        ; call with current continuation
-   (prog (_let x-k k e-body) env k #f)]                        ; if call-cc operand is a function
+  [((prog (fn (list x-k) e-body) env (call-cc-op k) _))         ; call with current continuation
+   (prog (_let x-k k e-body) env k #f)]                         ; if call-cc operand is a function
 
-  [((prog (fn xs e-body) _ (call-cc-op k) _))                  ; error if call-cc operand function
-   (prog (err (call-cc-narg xs)) '() 'mt #f)]                  ; does not have exactly one argument
+  [((prog (fn xs e-body) _ (call-cc-op k) _))                   ; error if call-cc operand function
+   (prog (err (call-cc-narg xs)) '() (mt) #f)]                  ; does not have exactly one argument
 
-  [((prog e1 _ (call-cc-op k) #t))                             ; error if call-cc operand is no
-   (prog (err (call-cc-no-fn (assert e1 value?))) '() 'mt #f)] ; function
+  [((prog e1 _ (call-cc-op k) #t))                              ; error if call-cc operand is no
+   (prog (err (call-cc-no-fn (assert e1 value?))) '() (mt) #f)] ; function
 
   
   ;-----------------------------
@@ -569,8 +573,6 @@
 
   [(_)
    #f])
-
-
 
 
 

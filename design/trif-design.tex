@@ -1,0 +1,79 @@
+\documentclass{article}
+
+\usepackage{paralist}
+
+\newtheorem{principle}{Principle}
+
+\begin{document}
+
+  \section{Principles}
+
+
+  \subsection{Context-independence}
+
+  \begin{principle}
+    All values are combinators.
+  \end{principle}
+
+
+  \subsection{Serializability}
+
+
+  \begin{principle}
+    All values have a unique textual form.
+  \end{principle}
+
+  \subsection{Equality}
+
+  One question any programming language has to deal with is how to define equality. The question when things should be equal is a tough one and has at least two answers:
+  \begin{inparaenum}[(i)]
+  	\item if it \textit{looks} the same then it is equal or
+  	\item if it \textit{means} the same then it is equal.
+  \end{inparaenum}
+  E.g., the Erlang designers stick more to form to define equality. Consider the following Erlang listing:
+  \begin{verbatim}
+is_integer( 5.0 ).
+false
+  \end{verbatim}
+  In Erlang \texttt{5.0} is not an integer because it does not look like one. In contrast, the Racket designers like to think of equality in terms of the meaning of things. Consider the following Racket listing:
+  \begin{verbatim}
+(integer? 5.0)
+#t
+  \end{verbatim}
+  In Racket \texttt{5.0} is an integer because it means the same as the integer \texttt{5}.
+
+  The problem I have with the meaning-oriented approach is that meaning changes depending on context. The form of an expression is, however, independent of the context.
+
+  \begin{principle}
+  	If it looks the same, it is equal.
+  \end{principle}
+
+  \subsection{No Static Types}
+
+  I do not think that it is possible to make a type system that is simple, safe, and flexible at the same time. To make a statically typed language one must make a compromise towards either of the goals
+  \begin{inparaenum}[(i)]
+    \item One can make a safe and flexible type system but it is on the user to prove that his type annotations hold.
+    \item One can make a safe and simple type system but a lot of useful programs would not type.
+    \item Finally, one can make a simple and flexible type system but the type system would not cover the common error sources like accessing an empty list or dividing by zero.
+  \end{inparaenum}
+  Thus, Trif has only dynamic types.
+
+  \subsection{No Contracts}
+
+  The fallback solution if no static types are available are contracts. Contracts, however, are slow.
+
+  \subsection{Checked Variants}
+
+  For Trif I want a safety mechanism I call checked variants. A variant is a tagged expression. To be allowed to tag an expression, the expression must pass a check. So at construction time we check the validity of the expression. This has several advantages:
+  \begin{inparaenum}[(i)]
+  	\item In contrast to contracts, the checked variant validates the expression exactly once, not every time it appears as the argument of a function.
+  	\item In contrast to types, the check predicate can be arbitrarily complex and, thus, allows for a fine-grained theory with minimum effort on the language side.
+  	\item Using variants is optional in nature. A theory of gradual typing is, thus, unnecessary.
+  	\item The only drawback is that the check happens at run-time instead of compile-time.
+  \end{inparaenum}
+
+
+
+
+
+\end{document}
